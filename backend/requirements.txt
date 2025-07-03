@@ -1,0 +1,8 @@
+# Django Backend Files
+
+# requirements.txt
+"""
+Django==4.2.7
+django-cors-headers==4.3.1
+whitenoise==6.6.0
+"""

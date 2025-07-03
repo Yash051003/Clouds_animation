@@ -1,0 +1,54 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pyc
+*.pdb
+
+# Django specific
+*.sqlite3
+*.log
+*.pot
+*.pyc
+db.sqlite3
+*.mo
+*.py[cod]
+*.egg
+*.egg-info/
+dist/
+build/
+*.manifest
+local_settings.py
+.env
+.env.*
+
+# Media & static files (collected or user-uploaded)
+media/
+staticfiles/
+static_root/
+node_modules/
+
+# Virtual environment
+venv/
+env/
+ENV/
+.venv/
+
+# VSCode / PyCharm / Editors
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# OS junk files
+.DS_Store
+Thumbs.db
+
+# Coverage / testing
+htmlcov/
+.coverage
+.tox/
+.pytest_cache/
+nosetests.xml
+cove
