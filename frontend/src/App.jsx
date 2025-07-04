@@ -1,7 +1,15 @@
 import React, { useRef, useEffect, useState } from 'react';
 import * as THREE from 'three';
 
-// Cloud Scene Component
+const colorStops = [
+  [255, 255, 255],  // White
+  [255, 165, 0],    // Orange
+  [255, 105, 180]   // Pink
+];
+
+const interpolateColor = (c1, c2, t) =>
+  c1.map((v, i) => Math.round(v + (c2[i] - v) * t));
+
 const CloudScene = ({ scrollProgress }) => {
   const mountRef = useRef();
   const sceneRef = useRef();
@@ -11,28 +19,19 @@ const CloudScene = ({ scrollProgress }) => {
   const frameRef = useRef();
 
   useEffect(() => {
-    // Scene setup
     const scene = new THREE.Scene();
     sceneRef.current = scene;
 
-    // Camera setup
-    const camera = new THREE.PerspectiveCamera(
-      75,
-      window.innerWidth / window.innerHeight,
-      0.1,
-      1000
-    );
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
     camera.position.set(0, 0, 5);
     cameraRef.current = camera;
 
-    // Renderer setup
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setClearColor(0x87CEEB, 1); // Sky blue background
+    renderer.setClearColor(0x87ceeb, 1);
     mountRef.current.appendChild(renderer.domElement);
     rendererRef.current = renderer;
 
-    // Lighting
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
     scene.add(ambientLight);
 
@@ -40,139 +39,296 @@ const CloudScene = ({ scrollProgress }) => {
     directionalLight.position.set(10, 10, 5);
     scene.add(directionalLight);
 
-    // Cloud shader material
-    const cloudVertexShader = `
-      uniform float time;
-      uniform float scrollProgress;
-      varying vec3 vPosition;
-      varying vec3 vNormal;
-      
-      void main() {
-        vPosition = position;
-        vNormal = normal;
-        
-        vec3 pos = position;
-        // Add some movement based on time and scroll
-        pos.x += sin(time * 0.5 + position.y * 0.1) * 0.1;
-        pos.z += cos(time * 0.3 + position.x * 0.1) * 0.1;
-        
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
-      }
-    `;
-
-    const cloudFragmentShader = `
-      uniform float time;
-      uniform float scrollProgress;
-      uniform vec3 color1;
-      uniform vec3 color2;
-      uniform vec3 color3;
-      varying vec3 vPosition;
-      varying vec3 vNormal;
-      
-      void main() {
-        // Create cloud-like noise
-        float noise = sin(vPosition.x * 2.0 + time) * 
-                     cos(vPosition.y * 3.0 + time * 0.7) * 
-                     sin(vPosition.z * 2.5 + time * 0.5);
-        
-        // Interpolate between colors based on scroll progress
-        vec3 color;
-        if (scrollProgress < 0.5) {
-          color = mix(color1, color2, scrollProgress * 2.0);
-        } else {
-          color = mix(color2, color3, (scrollProgress - 0.5) * 2.0);
-        }
-        
-        // Add some transparency and glow
-        float alpha = 0.7 + noise * 0.3;
-        gl_FragColor = vec4(color, alpha);
-      }
-    `;
-
-    // Create cloud material
-    const cloudMaterial = new THREE.ShaderMaterial({
-      vertexShader: cloudVertexShader,
-      fragmentShader: cloudFragmentShader,
-      uniforms: {
-        time: { value: 0 },
-        scrollProgress: { value: 0 },
-        color1: { value: new THREE.Color(0xffffff) }, // White
-        color2: { value: new THREE.Color(0xffa500) }, // Orange
-        color3: { value: new THREE.Color(0xffc0cb) }  // Pink
-      },
-      transparent: true,
-      side: THREE.DoubleSide
-    });
-
-    // Create cloud geometries
-    const clouds = [];
-    const cloudGeometry = new THREE.SphereGeometry(0.5, 16, 16);
+    // Load cloud textures
+    const textureLoader = new THREE.TextureLoader();
+    const cloudTextures = [];
     
-    for (let i = 0; i < 20; i++) {
-      const cloudGroup = new THREE.Group();
+    // Load multiple cloud textures
+    const loadTextures = async () => {
+      const texturePromises = [];
       
-      // Create multiple spheres for each cloud
-      for (let j = 0; j < 5; j++) {
-        const sphere = new THREE.Mesh(cloudGeometry, cloudMaterial.clone());
-        sphere.position.set(
-          (Math.random() - 0.5) * 2,
-          (Math.random() - 0.5) * 2,
-          (Math.random() - 0.5) * 2
-        );
-        sphere.scale.set(
-          0.5 + Math.random() * 0.5,
-          0.5 + Math.random() * 0.5,
-          0.5 + Math.random() * 0.5
-        );
-        cloudGroup.add(sphere);
-      }
-      
-      // Position clouds in 3D space
-      cloudGroup.position.set(
-        (Math.random() - 0.5) * 20,
-        (Math.random() - 0.5) * 10,
-        (Math.random() - 0.5) * 20 - 10
-      );
-      
-      scene.add(cloudGroup);
-      clouds.push(cloudGroup);
-    }
-    
-    cloudsRef.current = clouds;
-
-    // Animation loop
-    const animate = () => {
-      frameRef.current = requestAnimationFrame(animate);
-      
-      const time = Date.now() * 0.001;
-      
-      // Update shader uniforms
-      clouds.forEach(cloud => {
-        cloud.children.forEach(sphere => {
-          sphere.material.uniforms.time.value = time;
-          sphere.material.uniforms.scrollProgress.value = scrollProgress;
+      // Try to load cloud1.png and cloud2.png, add more as needed
+      for (let i = 1; i <= 2; i++) {
+        const promise = new Promise((resolve, reject) => {
+          textureLoader.load(
+            `/clouds/cloud${i}.png`,
+            (texture) => {
+              texture.transparent = true;
+              texture.alphaTest = 0.1;
+              resolve(texture);
+            },
+            undefined,
+            (error) => {
+              console.warn(`Could not load cloud${i}.png:`, error);
+              resolve(null);
+            }
+          );
         });
-      });
+        texturePromises.push(promise);
+      }
       
-      renderer.render(scene, camera);
+      const loadedTextures = await Promise.all(texturePromises);
+      cloudTextures.push(...loadedTextures.filter(tex => tex !== null));
+      
+      // If no textures loaded, create a fallback
+      if (cloudTextures.length === 0) {
+        console.warn('No cloud textures loaded, using fallback');
+        const canvas = document.createElement('canvas');
+        canvas.width = 256;
+        canvas.height = 256;
+        const ctx = canvas.getContext('2d');
+        
+        // Create a simple cloud-like gradient
+        const gradient = ctx.createRadialGradient(128, 128, 0, 128, 128, 128);
+        gradient.addColorStop(0, 'rgba(255, 255, 255, 0.8)');
+        gradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.4)');
+        gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+        
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, 256, 256);
+        
+        const fallbackTexture = new THREE.CanvasTexture(canvas);
+        cloudTextures.push(fallbackTexture);
+      }
+      
+      createClouds();
     };
-    
-    animate();
 
-    // Handle window resize
+    const createClouds = () => {
+      const clouds = [];
+      
+      // Create horizontal cloud band - evenly distributed across screen width
+      const totalClouds = 120;
+      const bandWidth = 60; // Total width of the cloud band
+      const bandHeight = 4; // Height of the cloud band (thin horizontal strip)
+      const bandCenterY = 0; // Center the band vertically
+      
+      for (let i = 0; i < totalClouds; i++) {
+        // Random texture selection
+        const texture = cloudTextures[Math.floor(Math.random() * cloudTextures.length)].clone();
+        texture.needsUpdate = true;
+        
+        // Create shader material without rotation effects
+        const cloudMaterial = new THREE.ShaderMaterial({
+          uniforms: {
+            map: { value: texture },
+            time: { value: 0 },
+            scrollProgress: { value: 0 },
+            color1: { value: new THREE.Color(0xffffff) },
+            color2: { value: new THREE.Color(0xffa500) },
+            color3: { value: new THREE.Color(0xff69b4) },
+            opacity: { value: 0.4 + Math.random() * 0.5 } // Varying opacity for natural effect
+          },
+          vertexShader: `
+            uniform float time;
+            varying vec2 vUv;
+            varying vec3 vPosition;
+            
+            void main() {
+              vUv = uv;
+              vPosition = position;
+              
+              vec3 pos = position;
+              // Very subtle vertical floating only - no rotation
+              pos.y += sin(time * 0.2 + position.x * 0.02) * 0.03;
+              
+              gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+            }
+          `,
+          fragmentShader: `
+            uniform sampler2D map;
+            uniform float time;
+            uniform float scrollProgress;
+            uniform vec3 color1;
+            uniform vec3 color2;
+            uniform vec3 color3;
+            uniform float opacity;
+            
+            varying vec2 vUv;
+            varying vec3 vPosition;
+            
+            void main() {
+              vec4 texColor = texture2D(map, vUv);
+              
+              // Color interpolation based on scroll progress
+              vec3 color;
+              if (scrollProgress < 0.5) {
+                color = mix(color1, color2, scrollProgress * 2.0);
+              } else {
+                color = mix(color2, color3, (scrollProgress - 0.5) * 2.0);
+              }
+              
+              // Apply color tint to the cloud
+              vec3 finalColor = texColor.rgb * color;
+              
+              // Maintain alpha from texture
+              float alpha = texColor.a * opacity;
+              
+              gl_FragColor = vec4(finalColor, alpha);
+            }
+          `,
+          transparent: true,
+          side: THREE.DoubleSide,
+          depthWrite: false,
+          blending: THREE.NormalBlending
+        });
+        
+        // Use plane geometry for cloud sprites - consistent sizing
+        const cloudGeometry = new THREE.PlaneGeometry(
+          1.5 + Math.random() * 2.5, // Width: 1.5-4
+          1 + Math.random() * 1.5     // Height: 1-2.5
+        );
+        
+        const cloudMesh = new THREE.Mesh(cloudGeometry, cloudMaterial);
+        
+        // Position clouds in horizontal band formation
+        // Distribute evenly across width with some randomness
+        const baseX = -bandWidth/2 + (i / totalClouds) * bandWidth;
+        const randomOffsetX = (Math.random() - 0.5) * 3; // Small random offset
+        const xPosition = baseX + randomOffsetX;
+        
+        // Keep clouds in thin horizontal band
+        const yPosition = bandCenterY + (Math.random() - 0.5) * bandHeight;
+        
+        // Multiple depth layers for richness
+        const zPosition = -20 + (Math.random() * 25);
+        
+        cloudMesh.position.set(xPosition, yPosition, zPosition);
+        
+        // NO rotation applied - clouds maintain original orientation
+        cloudMesh.rotation.set(0, 0, 0);
+        
+        // Varying scale for natural effect
+        const scale = 0.6 + Math.random() * 0.8;
+        cloudMesh.scale.set(scale, scale, scale);
+        
+        scene.add(cloudMesh);
+        clouds.push(cloudMesh);
+      }
+      
+      // Add additional background layer for more density
+      for (let i = 0; i < 60; i++) {
+        const texture = cloudTextures[Math.floor(Math.random() * cloudTextures.length)].clone();
+        texture.needsUpdate = true;
+        
+        const cloudMaterial = new THREE.ShaderMaterial({
+          uniforms: {
+            map: { value: texture },
+            time: { value: 0 },
+            scrollProgress: { value: 0 },
+            color1: { value: new THREE.Color(0xffffff) },
+            color2: { value: new THREE.Color(0xffa500) },
+            color3: { value: new THREE.Color(0xff69b4) },
+            opacity: { value: 0.2 + Math.random() * 0.3 } // Lower opacity for background
+          },
+          vertexShader: `
+            uniform float time;
+            varying vec2 vUv;
+            varying vec3 vPosition;
+            
+            void main() {
+              vUv = uv;
+              vPosition = position;
+              
+              vec3 pos = position;
+              // Minimal movement for background clouds
+              pos.y += sin(time * 0.1 + position.x * 0.01) * 0.02;
+              
+              gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+            }
+          `,
+          fragmentShader: `
+            uniform sampler2D map;
+            uniform float time;
+            uniform float scrollProgress;
+            uniform vec3 color1;
+            uniform vec3 color2;
+            uniform vec3 color3;
+            uniform float opacity;
+            
+            varying vec2 vUv;
+            varying vec3 vPosition;
+            
+            void main() {
+              vec4 texColor = texture2D(map, vUv);
+              
+              vec3 color;
+              if (scrollProgress < 0.5) {
+                color = mix(color1, color2, scrollProgress * 2.0);
+              } else {
+                color = mix(color2, color3, (scrollProgress - 0.5) * 2.0);
+              }
+              
+              vec3 finalColor = texColor.rgb * color;
+              float alpha = texColor.a * opacity;
+              
+              gl_FragColor = vec4(finalColor, alpha);
+            }
+          `,
+          transparent: true,
+          side: THREE.DoubleSide,
+          depthWrite: false,
+          blending: THREE.NormalBlending
+        });
+        
+        const cloudGeometry = new THREE.PlaneGeometry(
+          2 + Math.random() * 3,
+          1.5 + Math.random() * 2
+        );
+        
+        const backgroundCloud = new THREE.Mesh(cloudGeometry, cloudMaterial);
+        
+        // Distribute background clouds across wider area
+        const xPosition = -bandWidth/2 + (Math.random() * bandWidth * 1.2);
+        const yPosition = bandCenterY + (Math.random() - 0.5) * (bandHeight * 1.5);
+        const zPosition = -35 + (Math.random() * 20);
+        
+        backgroundCloud.position.set(xPosition, yPosition, zPosition);
+        
+        // NO rotation for background clouds either
+        backgroundCloud.rotation.set(0, 0, 0);
+        
+        const scale = 0.4 + Math.random() * 0.6;
+        backgroundCloud.scale.set(scale, scale, scale);
+        
+        scene.add(backgroundCloud);
+        clouds.push(backgroundCloud);
+      }
+      
+      cloudsRef.current = clouds;
+      
+      // Start animation loop
+      const animate = () => {
+        frameRef.current = requestAnimationFrame(animate);
+        const time = Date.now() * 0.001;
+        
+        clouds.forEach((cloudMesh, index) => {
+          // Update shader uniforms only
+          cloudMesh.material.uniforms.time.value = time;
+          cloudMesh.material.uniforms.scrollProgress.value = scrollProgress;
+          
+          // No rotation animations - clouds maintain original orientation
+        });
+        
+        renderer.render(scene, camera);
+      };
+      
+      animate();
+    };
+
+    // Start loading textures
+    loadTextures();
+
     const handleResize = () => {
       camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();
       renderer.setSize(window.innerWidth, window.innerHeight);
     };
-    
+
     window.addEventListener('resize', handleResize);
 
-    // Cleanup
     return () => {
-      if (frameRef.current) {
-        cancelAnimationFrame(frameRef.current);
-      }
+      if (frameRef.current) cancelAnimationFrame(frameRef.current);
       window.removeEventListener('resize', handleResize);
       if (mountRef.current && renderer.domElement) {
         mountRef.current.removeChild(renderer.domElement);
@@ -181,10 +337,9 @@ const CloudScene = ({ scrollProgress }) => {
     };
   }, []);
 
-  // Update camera position based on scroll
   useEffect(() => {
     if (cameraRef.current) {
-      const targetZ = 5 - scrollProgress * 15; // Move forward as we scroll
+      const targetZ = 5 - scrollProgress * 15;
       cameraRef.current.position.z = targetZ;
     }
   }, [scrollProgress]);
@@ -192,7 +347,7 @@ const CloudScene = ({ scrollProgress }) => {
   return <div ref={mountRef} className="fixed inset-0 -z-10" />;
 };
 
-// Main App Component
+
 const App = () => {
   const [scrollProgress, setScrollProgress] = useState(0);
 
@@ -208,64 +363,47 @@ const App = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  useEffect(() => {
+    let animationFrameId;
+
+    const updateBackground = () => {
+      const p = scrollProgress;
+      let startColor, endColor, t;
+      if (p < 0.5) {
+        startColor = colorStops[0];
+        endColor = colorStops[1];
+        t = p / 0.5;
+      } else {
+        startColor = colorStops[1];
+        endColor = colorStops[2];
+        t = (p - 0.5) / 0.5;
+      }
+      const [r, g, b] = interpolateColor(startColor, endColor, t);
+      document.documentElement.style.background = `rgba(${r}, ${g}, ${b}, 0.9)`;
+      animationFrameId = requestAnimationFrame(updateBackground);
+    };
+
+    updateBackground();
+    return () => cancelAnimationFrame(animationFrameId);
+  }, [scrollProgress]);
+
   return (
-    <div className="relative">
+    <div className="relative z-10">
       <CloudScene scrollProgress={scrollProgress} />
-      
-      {/* Content sections for scrolling */}
       <div className="relative z-10">
-        <section className="h-screen flex items-center justify-center bg-transparent">
-          <div className="text-center text-white">
-            <h1 className="text-6xl font-bold mb-4 drop-shadow-lg">
-              Cloud Journey
-            </h1>
-            <p className="text-2xl drop-shadow-md">
-              Scroll to explore the sky
-            </p>
-          </div>
-        </section>
-
-        <section className="h-screen flex items-center justify-center bg-transparent">
-          <div className="text-center text-white max-w-2xl px-8">
-            <h2 className="text-4xl font-bold mb-6 drop-shadow-lg">
-              Dawn Approaches
-            </h2>
-            <p className="text-xl drop-shadow-md leading-relaxed">
-              As you journey through the clouds, watch as the colors transform
-              from pure white to the warm hues of sunrise. The world awakens
-              with golden light painting the sky.
-            </p>
-          </div>
-        </section>
-
-        <section className="h-screen flex items-center justify-center bg-transparent">
-          <div className="text-center text-white max-w-2xl px-8">
-            <h2 className="text-4xl font-bold mb-6 drop-shadow-lg">
-              Sunset Dreams
-            </h2>
-            <p className="text-xl drop-shadow-md leading-relaxed">
-              Continue your journey as the sky blushes with pink and orange,
-              creating a magical atmosphere that stretches endlessly
-              in all directions.
-            </p>
-          </div>
-        </section>
-
-        <section className="h-screen flex items-center justify-center bg-transparent">
-          <div className="text-center text-white max-w-2xl px-8">
-            <h2 className="text-4xl font-bold mb-6 drop-shadow-lg">
-              Beyond the Horizon
-            </h2>
-            <p className="text-xl drop-shadow-md leading-relaxed">
-              You've traveled far through the ethereal cloudscape.
-              The journey continues infinitely, with new colors and
-              formations waiting to be discovered.
-            </p>
-          </div>
-        </section>
+        {['Cloud Journey', 'Dawn Approaches', 'Sunset Dreams', 'Beyond the Horizon'].map((title, idx) => (
+          <section key={idx} className="h-screen flex items-center justify-center bg-transparent px-8">
+            <div className="text-center text-white max-w-2xl">
+              <h2 className="text-4xl font-bold mb-6 drop-shadow-lg">{title}</h2>
+              <p className="text-xl drop-shadow-md leading-relaxed">
+                {idx === 0
+                  ? "Scroll to explore the sky with realistic cloud textures"
+                  : "Experience the transformation of the sky as you move forward in your cloud journey."}
+              </p>
+            </div>
+          </section>
+        ))}
       </div>
-
-      {/* Scroll indicator */}
       <div className="fixed bottom-8 right-8 z-20">
         <div className="bg-white bg-opacity-20 backdrop-blur-sm rounded-full p-4">
           <div className="text-white text-sm">

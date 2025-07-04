@@ -1,0 +1,12 @@
+version: '3.8'
+
+services:
+  vite:
+    build: .
+    ports:
+      - "5173:5173"
+    volumes:
+      - .:/app
+      - /app/node_modules   # Prevent node_modules conflicts between host and container
+    stdin_open: true
+    tty: true
