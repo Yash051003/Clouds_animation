@@ -1,10 +1,11 @@
 import React, { useRef, useEffect, useState } from 'react';
 import * as THREE from 'three';
+import ApiService from './services/api';
 
 const colorStops = [
   [0, 0, 0],        // Black
-  [255, 105, 180],  // Pink
-  [135, 206, 235]   // Sky Blue
+  [255, 20, 147],  // Pink
+  [78, 61, 139]   // Sky Blue
 ];
 
 const interpolateColor = (c1, c2, t) =>
@@ -46,8 +47,8 @@ const CloudScene = ({ scrollProgress }) => {
         const cloudTextures = [];
         const loadPromises = [];
         
-        // Load 5 cloud textures
-        for (let i = 1; i <= 5; i++) {
+        // Load 3 cloud textures
+        for (let i = 1; i <= 3; i++) {
           const promise = new Promise((resolveTexture) => {
             textureLoader.load(
               `/clouds/cloud${i}.png`,
@@ -114,7 +115,7 @@ const CloudScene = ({ scrollProgress }) => {
         const clouds = [];
       
         // Create bottom cloud cluster (foreground)
-        const foregroundCount = 60;
+        const foregroundCount = 100;
         for (let i = 0; i < foregroundCount; i++) {
           const texture = cloudTextures[Math.floor(Math.random() * cloudTextures.length)];
           
@@ -161,7 +162,7 @@ const CloudScene = ({ scrollProgress }) => {
         }
         
         // Create mid-layer clouds
-        const midLayerCount = 40;
+        const midLayerCount = 80;
         for (let i = 0; i < midLayerCount; i++) {
           const texture = cloudTextures[Math.floor(Math.random() * cloudTextures.length)];
           
@@ -361,8 +362,128 @@ const CloudScene = ({ scrollProgress }) => {
   return <div ref={mountRef} className="fixed inset-0 -z-10" />;
 };
 
+// Contact Form Component
+const ContactForm = () => {
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    message: ''
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitStatus, setSubmitStatus] = useState(null);
+
+  const handleChange = (e) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value
+    });
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    setSubmitStatus(null);
+
+    try {
+      const response = await ApiService.submitContactForm(formData);
+      setSubmitStatus({ type: 'success', message: response.message });
+      setFormData({ name: '', email: '', message: '' });
+    } catch (error) {
+      setSubmitStatus({ 
+        type: 'error', 
+        message: 'Failed to send message. Please try again.' 
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="max-w-lg mx-auto">
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <input
+            type="text"
+            name="name"
+            placeholder="Your Name"
+            value={formData.name}
+            onChange={handleChange}
+            required
+            className="w-full px-4 py-3 bg-white bg-opacity-10 backdrop-blur-md border border-white border-opacity-20 rounded-lg text-white placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-white focus:ring-opacity-50"
+          />
+        </div>
+        <div>
+          <input
+            type="email"
+            name="email"
+            placeholder="Your Email"
+            value={formData.email}
+            onChange={handleChange}
+            required
+            className="w-full px-4 py-3 bg-white bg-opacity-10 backdrop-blur-md border border-white border-opacity-20 rounded-lg text-white placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-white focus:ring-opacity-50"
+          />
+        </div>
+        <div>
+          <textarea
+            name="message"
+            placeholder="Your Message"
+            rows="4"
+            value={formData.message}
+            onChange={handleChange}
+            required
+            className="w-full px-4 py-3 bg-white bg-opacity-10 backdrop-blur-md border border-white border-opacity-20 rounded-lg text-white placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-white focus:ring-opacity-50 resize-none"
+          />
+        </div>
+        <button
+          type="submit"
+          disabled={isSubmitting}
+          className="w-full bg-white bg-opacity-20 backdrop-blur-md border border-white border-opacity-30 text-white py-3 rounded-lg font-medium hover:bg-opacity-30 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {isSubmitting ? 'Sending...' : 'Send Message'}
+        </button>
+      </form>
+      
+      {submitStatus && (
+        <div className={`mt-4 p-4 rounded-lg ${
+          submitStatus.type === 'success' 
+            ? 'bg-green-500 bg-opacity-20 border border-green-500 border-opacity-30' 
+            : 'bg-red-500 bg-opacity-20 border border-red-500 border-opacity-30'
+        }`}>
+          <p className="text-white text-sm">{submitStatus.message}</p>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Main App Component
 const App = () => {
   const [scrollProgress, setScrollProgress] = useState(0);
+  const [portfolioData, setPortfolioData] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchPortfolioData = async () => {
+      try {
+        const data = await ApiService.fetchPortfolioData();
+        setPortfolioData(data);
+      } catch (error) {
+        console.error('Failed to fetch portfolio data:', error);
+        // Fallback data
+        setPortfolioData({
+          name: 'Portfolio',
+          title: 'Full Stack Developer',
+          description: 'Creating amazing web experiences',
+          skills: ['React', 'Django', 'Three.js'],
+          projects: []
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchPortfolioData();
+  }, []);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -392,80 +513,91 @@ const App = () => {
       }
       
       const [r, g, b] = interpolateColor(startColor, endColor, t);
-      document.body.style.background = `linear-gradient(180deg, rgb(${r}, ${g}, ${b}) 0%, rgb(${Math.floor(r*0.7)}, ${Math.floor(g*0.7)}, ${Math.floor(b*0.7)}) 100%)`;
+      document.body.style.background = `linear-gradient(180deg, rgb(${r}, ${g}, ${b}) 0%, rgb(${Math.floor(r * 0.7)}, ${Math.floor(g * 0.7)}, ${Math.floor(b * 0.7)}) 100%)`;
     };
 
     updateBackground();
   }, [scrollProgress]);
 
-  return (
-    <div className="relative z-10">
-      <CloudScene scrollProgress={scrollProgress} />
-      <div className="relative z-10">
-        {[
-          {
-            title: "Say hello to",
-            subtitle: "the ultimate",
-            description: "shader editor.",
-            detail: "Create, fork and publish shader graphs with the world using an intuitive and easy to use tool built for all."
-          },
-          {
-            title: "Ethereal Awakening",
-            subtitle: "Pink dreams emerge from shadow",
-            description: "Creative Expression.",
-            detail: "Watch as vibrant hues illuminate the path ahead, revealing new dimensions of artistic possibility."
-          },
-          {
-            title: "Celestial Horizon",
-            subtitle: "Transformation reaches the sky",
-            description: "Infinite Potential.",
-            detail: "Transcend the boundaries of imagination as blue heavens open to endless creative opportunities."
-          },
-          {
-            title: "Beyond the Clouds",
-            subtitle: "Where sky meets eternity",
-            description: "Pure Artistry.",
-            detail: "Experience the ultimate synthesis of color and motion in this realm of digital creativity."
-          }
-        ].map((section, idx) => (
-          <section key={idx} className="h-screen flex items-center justify-center bg-transparent px-8">
-            <div className="text-center text-white max-w-4xl">
-              <div className="mb-8">
-                <h2 className="text-5xl md:text-7xl font-bold mb-2 tracking-tight drop-shadow-2xl leading-tight">
-                  {section.title}
-                </h2>
-                <h3 className="text-5xl md:text-7xl font-bold mb-2 tracking-tight drop-shadow-2xl leading-tight">
-                  {section.subtitle}
-                </h3>
-                <h4 className="text-5xl md:text-7xl font-bold mb-8 tracking-tight drop-shadow-2xl leading-tight">
-                  {section.description}
-                </h4>
-              </div>
-              <p className="text-lg md:text-xl font-normal leading-relaxed opacity-90 max-w-2xl mx-auto drop-shadow-md mb-8">
-                {section.detail}
-              </p>
-              {idx === 0 && (
-                <button className="bg-white bg-opacity-10 backdrop-blur-md border border-white border-opacity-20 text-white px-8 py-4 rounded-full font-medium hover:bg-opacity-20 transition-all duration-300 drop-shadow-lg">
-                  Open App →
-                </button>
-              )}
-            </div>
-          </section>
-        ))}
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-white text-2xl">Loading...</div>
       </div>
-      <div className="fixed bottom-8 right-8 z-20">
-        <div className="bg-black bg-opacity-30 backdrop-blur-md rounded-2xl px-6 py-4 border border-white border-opacity-10">
-          <div className="text-white text-sm font-medium tracking-wide">
-            Scroll: {Math.round(scrollProgress * 100)}%
-          </div>
-          <div className="w-24 h-1 bg-white bg-opacity-20 rounded-full mt-2">
-            <div 
-              className="h-full bg-white rounded-full transition-all duration-300 ease-out"
-              style={{ width: `${scrollProgress * 100}%` }}
-            />
+    );
+  }
+
+  return (
+    <div className="min-h-screen text-white">
+      <CloudScene scrollProgress={scrollProgress} />
+      
+      {/* Hero Section */}
+      <section className="min-h-screen flex items-center justify-center px-4 relative z-10">
+        <div className="text-center">
+          <h1 className="text-6xl md:text-8xl font-bold mb-4 bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
+            {portfolioData?.name || 'Your Name'}
+          </h1>
+          <p className="text-xl md:text-2xl mb-8 text-gray-300">
+            {portfolioData?.title || 'Full Stack Developer'}
+          </p>
+          <p className="text-lg md:text-xl max-w-2xl mx-auto text-gray-400">
+            {portfolioData?.description || 'Creating beautiful and functional web experiences'}
+          </p>
+        </div>
+      </section>
+
+      {/* Skills Section */}
+      <section className="py-20 px-4 relative z-10">
+        <div className="max-w-4xl mx-auto">
+          <h2 className="text-4xl font-bold text-center mb-12">Skills</h2>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+            {(portfolioData?.skills || ['React', 'Node.js', 'Python', 'Django', 'Three.js', 'JavaScript', 'CSS', 'HTML']).map((skill, index) => (
+              <div key={index} className="bg-white bg-opacity-10 backdrop-blur-md rounded-lg p-4 text-center border border-white border-opacity-20">
+                <span className="text-lg font-medium">{skill}</span>
+              </div>
+            ))}
           </div>
         </div>
-      </div>
+      </section>
+
+      {/* Projects Section */}
+      <section className="py-20 px-4 relative z-10">
+        <div className="max-w-6xl mx-auto">
+          <h2 className="text-4xl font-bold text-center mb-12">Projects</h2>
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {(portfolioData?.projects || [
+              { title: 'Project 1', description: 'Amazing web application', tech: ['React', 'Node.js'] },
+              { title: 'Project 2', description: 'Interactive 3D experience', tech: ['Three.js', 'WebGL'] },
+              { title: 'Project 3', description: 'Full-stack platform', tech: ['Django', 'PostgreSQL'] }
+            ]).map((project, index) => (
+              <div key={index} className="bg-white bg-opacity-10 backdrop-blur-md rounded-lg p-6 border border-white border-opacity-20">
+                <h3 className="text-xl font-bold mb-3">{project.title}</h3>
+                <p className="text-gray-300 mb-4">{project.description}</p>
+                <div className="flex flex-wrap gap-2">
+                  {project.tech?.map((tech, techIndex) => (
+                    <span key={techIndex} className="bg-white bg-opacity-20 px-2 py-1 rounded text-sm">
+                      {tech}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Contact Section */}
+      <section className="py-20 px-4 relative z-10">
+        <div className="max-w-4xl mx-auto">
+          <h2 className="text-4xl font-bold text-center mb-12">Get In Touch</h2>
+          <ContactForm />
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="py-8 px-4 text-center text-gray-400 relative z-10">
+        <p>&copy; 2024 {portfolioData?.name || 'Your Name'}. All rights reserved.</p>
+      </footer>
     </div>
   );
 };
