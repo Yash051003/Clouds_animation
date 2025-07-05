@@ -113,46 +113,93 @@ const CloudScene = ({ scrollProgress }) => {
         const cloudTextures = await loadCloudTextures();
         const clouds = [];
       
-        // Create foreground clouds
-        const foregroundCount = 80;
+        // Create bottom cloud cluster (foreground)
+        const foregroundCount = 60;
         for (let i = 0; i < foregroundCount; i++) {
           const texture = cloudTextures[Math.floor(Math.random() * cloudTextures.length)];
           
           const material = new THREE.MeshLambertMaterial({
             map: texture,
             transparent: true,
-            opacity: 0.7 + Math.random() * 0.3,
+            opacity: 0.8 + Math.random() * 0.2,
             side: THREE.DoubleSide,
             depthWrite: false,
             blending: THREE.NormalBlending
           });
           
           const geometry = new THREE.PlaneGeometry(
-            2 + Math.random() * 4,
-            1 + Math.random() * 2
+            3 + Math.random() * 6,
+            1.5 + Math.random() * 3
           );
           
           const cloud = new THREE.Mesh(geometry, material);
           
-          // Position clouds in a more visible area
+          // Position clouds at bottom of screen in a cluster
           cloud.position.set(
-            (Math.random() - 0.5) * 40, // -20 to 20
-            (Math.random() - 0.5) * 10 - 2, // -7 to 3 (slightly lower)
-            (Math.random() - 0.5) * 20 // -10 to 10
+            (Math.random() - 0.5) * 80, // Wide horizontal spread
+            -4 + Math.random() * 3, // Bottom cluster: -4 to -1
+            -5 + Math.random() * 15 // Coming from behind towards front
           );
           
-          cloud.rotation.z = (Math.random() - 0.5) * 0.4;
+          cloud.rotation.z = (Math.random() - 0.5) * 0.3;
           
-          const scale = 0.5 + Math.random() * 1.5;
+          const scale = 0.8 + Math.random() * 1.5;
           cloud.scale.set(scale, scale, scale);
           
-          // Add movement properties
+          // Add movement properties - moving forward (towards camera)
           cloud.userData = {
-            baseSpeed: 0.3 + Math.random() * 0.7,
-            floatSpeed: 0.5 + Math.random() * 0.5,
-            floatAmount: 0.1 + Math.random() * 0.2,
+            baseSpeed: 0.5 + Math.random() * 1.0, // Faster base speed
+            floatSpeed: 0.3 + Math.random() * 0.4,
+            floatAmount: 0.05 + Math.random() * 0.1,
             originalY: cloud.position.y,
-            isBackground: false
+            isBackground: false,
+            initialZ: cloud.position.z
+          };
+          
+          scene.add(cloud);
+          clouds.push(cloud);
+        }
+        
+        // Create mid-layer clouds
+        const midLayerCount = 40;
+        for (let i = 0; i < midLayerCount; i++) {
+          const texture = cloudTextures[Math.floor(Math.random() * cloudTextures.length)];
+          
+          const material = new THREE.MeshLambertMaterial({
+            map: texture,
+            transparent: true,
+            opacity: 0.5 + Math.random() * 0.3,
+            side: THREE.DoubleSide,
+            depthWrite: false,
+            blending: THREE.NormalBlending
+          });
+          
+          const geometry = new THREE.PlaneGeometry(
+            4 + Math.random() * 7,
+            2 + Math.random() * 4
+          );
+          
+          const cloud = new THREE.Mesh(geometry, material);
+          
+          // Position mid-layer clouds
+          cloud.position.set(
+            (Math.random() - 0.5) * 100,
+            -3 + Math.random() * 2, // -3 to -1
+            -20 + Math.random() * 15 // -20 to -5
+          );
+          
+          cloud.rotation.z = (Math.random() - 0.5) * 0.2;
+          
+          const scale = 1.0 + Math.random() * 1.5;
+          cloud.scale.set(scale, scale, scale);
+          
+          cloud.userData = {
+            baseSpeed: 0.3 + Math.random() * 0.6,
+            floatSpeed: 0.2 + Math.random() * 0.3,
+            floatAmount: 0.03 + Math.random() * 0.07,
+            originalY: cloud.position.y,
+            isBackground: false,
+            initialZ: cloud.position.z
           };
           
           scene.add(cloud);
@@ -160,45 +207,45 @@ const CloudScene = ({ scrollProgress }) => {
         }
         
         // Create background clouds
-        const backgroundCount = 40;
+        const backgroundCount = 30;
         for (let i = 0; i < backgroundCount; i++) {
           const texture = cloudTextures[Math.floor(Math.random() * cloudTextures.length)];
           
           const material = new THREE.MeshLambertMaterial({
             map: texture,
             transparent: true,
-            opacity: 0.3 + Math.random() * 0.4,
+            opacity: 0.2 + Math.random() * 0.3,
             side: THREE.DoubleSide,
             depthWrite: false,
             blending: THREE.NormalBlending
           });
           
           const geometry = new THREE.PlaneGeometry(
-            3 + Math.random() * 5,
-            1.5 + Math.random() * 3
+            5 + Math.random() * 10,
+            2.5 + Math.random() * 5
           );
           
           const cloud = new THREE.Mesh(geometry, material);
           
           // Position background clouds further back
           cloud.position.set(
-            (Math.random() - 0.5) * 60, // -30 to 30
-            (Math.random() - 0.5) * 15 - 1, // -8.5 to 6.5
-            -15 + Math.random() * 10 // -15 to -5
+            (Math.random() - 0.5) * 120,
+            -2 + Math.random() * 1.5, // -2 to -0.5
+            -40 + Math.random() * 20 // -40 to -20
           );
           
-          cloud.rotation.z = (Math.random() - 0.5) * 0.3;
+          cloud.rotation.z = (Math.random() - 0.5) * 0.1;
           
-          const scale = 0.8 + Math.random() * 1.2;
+          const scale = 1.2 + Math.random() * 2.0;
           cloud.scale.set(scale, scale, scale);
           
-          // Add movement properties
           cloud.userData = {
             baseSpeed: 0.1 + Math.random() * 0.3,
-            floatSpeed: 0.3 + Math.random() * 0.3,
-            floatAmount: 0.05 + Math.random() * 0.1,
+            floatSpeed: 0.1 + Math.random() * 0.2,
+            floatAmount: 0.02 + Math.random() * 0.05,
             originalY: cloud.position.y,
-            isBackground: true
+            isBackground: true,
+            initialZ: cloud.position.z
           };
           
           scene.add(cloud);
@@ -257,22 +304,23 @@ const CloudScene = ({ scrollProgress }) => {
       cloudsRef.current.forEach((cloud) => {
         const userData = cloud.userData;
         
-        // Horizontal movement with scroll influence
-        const speedMultiplier = 1 + (scrollProgress * 2);
+        // Forward movement with scroll influence (Z-axis movement towards camera)
+        const speedMultiplier = 1 + (scrollProgress * 4); // Increased scroll influence
         const moveSpeed = userData.baseSpeed * speedMultiplier;
-        cloud.position.x += moveSpeed * 0.016; // Normalize to 60fps
+        cloud.position.z += moveSpeed * 0.016; // Moving forward (towards camera)
         
         // Vertical floating
         const floatOffset = Math.sin(time * userData.floatSpeed) * userData.floatAmount;
         cloud.position.y = userData.originalY + floatOffset;
         
-        // Reset position when cloud moves off screen
-        if (cloud.position.x > 30) {
-          cloud.position.x = -30 - Math.random() * 10;
-          // Randomize Y position on reset
-          const yRange = userData.isBackground ? 15 : 10;
-          const yOffset = userData.isBackground ? -1 : -2;
-          cloud.position.y = (Math.random() - 0.5) * yRange + yOffset;
+        // Reset position when cloud passes the camera
+        if (cloud.position.z > 10) {
+          cloud.position.z = userData.initialZ - Math.random() * 10;
+          // Randomize position on reset
+          cloud.position.x = (Math.random() - 0.5) * (userData.isBackground ? 120 : 80);
+          const yRange = userData.isBackground ? 1.5 : 3;
+          const yOffset = userData.isBackground ? -2 : -4;
+          cloud.position.y = (Math.random() - 0.5) * yRange + yOffset + Math.random() * yRange;
           userData.originalY = cloud.position.y;
         }
       });
